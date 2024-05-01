@@ -1,0 +1,146 @@
+
+#Variables
+#audio_clip_band- NOISE+OGAudio
+#reduced_Noise -after adaptive filter is being applied
+#data- OGAudio
+
+
+
+def fftnoise(f):
+    f = np.array(f, dtype="complex")
+    Np = (len(f) - 1) // 2
+    phases = np.random.rand(Np) * 2 * np.pi
+    phases = np.cos(phases) + 1j * np.sin(phases)
+    f[1 : Np + 1] *= phases
+    f[-1 : -1 - Np : -1] = np.conj(f[1 : Np + 1])
+    return np.fft.ifft(f).real
+
+  def band_limited_noise(min_freq, max_freq, samples=1024, samplerate=1): 
+    freqs = np.abs(np.fft.fftfreq(samples, 1 / samplerate)) 
+    f = np.zeros(samples)
+    f[np.logical_and(freqs >= min_freq, freqs <= max_freq)] = 1
+    return fftnoise(f)
+
+#Domain: fftnoise operates in the frequency domain, generating noise directly in the frequency space, 
+#while band_limited_noise operates in the time domain, generating noise based on specified frequency limits.
+
+#Input: fftnoise directly takes frequency components as input, 
+#while band_limited_noise takes frequency limits (min_freq and max_freq) and generates noise within that frequency range.
+
+#Output: fftnoise returns noise in the time domain, 
+#while band_limited_noise returns noise in the frequency domain.
+
+#fftnoise generates noise directly in the frequency domain using specified phases,
+#while band_limited_noise generates noise in the time domain based on specified frequency limits.
+
+
+noise_len = 2 # seconds
+noise = band_limited_noise(min_freq=4000, mx_freq = 12000, samples=len(data), samplerate=rate)*10
+noise_clip = noise[:rate*noise_len]
+audio_clip_band_limited = data+10*noise
+
+
+fig, ax = plt.subplots(figsize=(20, 4))
+ax.plot(data)
+
+# Display the audio
+ipd.display(ipd.Audio(data, rate=rate))
+
+
+
+
+fig,ax=plt.subplots(figsize=(20,3))
+ax.plot(noise)
+
+IPython.display.Audio(data=noise,rate=rate)
+
+
+
+
+#noise added
+noise_len = 2 # seconds
+noise = band_limited_noise(min_freq=4000, max_freq = 12000, samples=len(data), samplerate=rate)*10
+noise_clip = noise[:rate*noise_len]
+audio_clip_band_limited = data+10*noise
+
+fig.ax= plt.subplots(figsize=(20,3))
+ax.plot(audio_clip_band_limited)
+
+IPython.display.Audio(data=audio_clip_band_limited,rate=rate)
+
+
+#First Filter(technique is from Stationary Noise reduce)
+
+def band_limited_noise(min_freq, samples=1024,samplerate=1):
+    freqs= np.abs(np.fft.fftfreq(samples, 1/samplerate))
+    f= np.zeros(samples)
+    f[np.logical_and(freqs >= min_freq, freqs <= max_freq)]=1
+    return fftnoise(f)
+    
+# stationary remove noise
+import noisereduce as nr
+
+# Assuming 'data' and 'rate' are defined elsewhere in your code
+reduced_noise = nr.reduce_noise(y=data, sr=rate, n_std_thresh_stationary=1.5, stationary=True)
+
+#filtered the voice
+fig.ax= plt.subplots(figsize=(20,3))
+ax.plot(reduced_noise)
+
+IPython.display.Audio(data=reduced_noise, rate=rate)
+
+
+
+
+#Noise reduce for stationary noise
+noise_reduced= nr.reduce_noise(y=data, sr=rate, prop_decrease=0, stationary=False)
+
+fig.ax= plt.subplots(figsize=(15,4))
+ax.plot(reduced_noise)
+
+fig, axs = plt.subplots(nrows=2, figsize=(15,6))
+axs[0].plot(data[3000:5000])
+axs[0].plot(noise_reduced[3000:5000])
+axs[0].plot(data)
+axs[0].plot(noise_reduced)
+
+
+
+#sec time filter
+fig, ax = plt.subplots(figsize=(15,5))
+ax.plot(audio_clip_band_limited)
+ax.plot(reduced_noise)
+
+IPython.display.Audio(data=reduced_noise, rate=rate)
+
+
+import time
+from datetime import timedelta as td
+import librosa
+import scipy.signal
+import numpy as np
+import matplotlib.pyplot as plt
+
+def _stft(y, n_fft, hop_length, win_length):
+    return librosa.stft(y=y, n_fft=n_fft, hop_length=hop_length, win_length=win_length)
+
+
+#y: Yeh parameter hai jo audio signal ko represent karta hai, matlab yeh batata hai ki humein kaunsa audio signal STFT mein convert karna hai.
+#n_fft: Yeh parameter hai jo frequency spectrum ka size define karta hai, matlab yeh batata hai ki humein har frame ke liye kitne frequencies ko consider karna hai.
+#hop_length: Yeh parameter hai jo frame ke beech ka gap define karta hai, matlab yeh batata hai ki humein har frame ke beech kaunsa duration lena hai.
+#win_length: Yeh parameter hai jo window size ko define karta hai, matlab yeh batata hai ki har frame mein kaunsa duration ka audio data include karna hai.
+
+
+def istft(y, hop_length, win_length):
+    return librosa.istft(y, hop_length, win_length)
+def amp_to_db(x):
+    return librosa.core.amplitude_to_db(x, ref=1.0, amin=1e-20, top_db=80.0)
+#The output is typically a numpy array containing the signal in decibels.
+
+def db_to_amp(x):
+    return librosa.core.db_to_amplitude(x, ref=1.0)
+
+
+
+
+
