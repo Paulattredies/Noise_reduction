@@ -143,7 +143,129 @@ def db_to_amp(x):
 
 #Spectral filtering is like tuning into a specific radio station while ignoring the others around it.
 
+def removeNoise(
+    audio_clip,
+    noise_clip,
+    n_grad_freq=2,
+    n_grad_time=4,
+    n_fft=2048,
+    win_length=2048,
+    hop_length=512,
+    n_std_thresh=1.5,
+    prop_decrease=1.0,
+    verbose=False,
+    visual=False,
+):
+    # Agar verbose mode chalu hai toh shuru mein time count karo
+    if verbose:
+        start = time.time()
+    
+    # Calculate kar noise ka STFT aur uska DB (decibel) value
+    noise_stft = _stft(noise_clip, n_fft, hop_length, win_length)
+    noise_stft_db = amp_to_db(np.abs(noise_stft))
+    
+    # Noise ke upar statistics calculate karo
+    mean_freq_noise = np.mean(noise_stft_db, axis=1)
+    std_freq_noise = np.std(noise_stft_db, axis=1)
+    noise_thresh = mean_freq_noise + std_freq_noise * n_std_thresh
+    
+    # Agar verbose mode chalu hai toh print karo noise ka STFT calculation ka time
+    if verbose:
+        print("STFT on noise:", td(seconds=time.time() - start))
+        start = time.time()
+    
+    # Signal ka STFT aur uska DB (decibel) value calculate karo
+    sig_stft = _stft(audio_clip, n_fft, hop_length, win_length)
+    sig_stft_db = amp_to_db(np.abs(sig_stft))
+    
+    # Agar verbose mode chalu hai toh print karo signal ka STFT calculation ka time
+    if verbose:
+        print("STFT on signal:", td(seconds=time.time() - start))
+        start = time.time()
+    
+    # Masking ke liye value calculate karo
+    mask_gain_db = np.min(amp_to_db(np.abs(sig_stft)))
+    print(noise_thresh, mask_gain_db)
+    
+    # Smoothing filter banake rakh
+    smoothing_filter = np.outer(
+        np.concatenate(
+            [
+                np.linspace(0, 1, n_grad_freq + 1, endpoint=False),
+                np.linspace(1, 0, n_grad_freq + 2),
+            ]
+        )[1:-1],
+        np.concatenate(
+            [
+                np.linspace(0, 1, n_grad_freq + 1, endpoint=False),
+                np.linspace(1, 0, n_grad_freq + 2),
+            ]
+        ),
+    )
+    smoothing_filter = smoothing_filter - smoothing_filter / np.sum(smoothing_filter)
 
+    # Masking threshold ko repeat karke shape match karao
+    db_thresh = np.repeat(
+        np.reshape(noise_thresh, [1, len(mean_freq_noise)]),
+        np.shape(sig_stft_db)[1],
+        axis=0,
+    ).T
+    
+    # Agar verbose mode chalu hai toh print karo masking ka calculation ka time
+    if verbose:
+        print("Masking:", td(seconds=time.time() - start))
+        start = time.time()
+    
+    # Mask ko smoothing filter ke saath convolve karo
+    sig_mask = scipy.signal.fftconvolve(sig_mask)
+    print("Masking:", td(seconds=time.time() - start))
+    start = time.time()
+    
+    # Mask ko smoothing filter ke saath convolve karo
+    sig_mask = scipy.signal.fftconvolve(sig_mask, smoothing_filter, mode="same")
+    sig_mask = sig_mask * prop_decrease
+    
+    # Agar verbose mode chalu hai toh print karo mask convolution ka time
+    if verbose:
+        print("Mask convolution:", td(seconds=time.time() - start))
+        start = time.time()
+    
+    # Signal ko mask karo
+    sig_stft_db_masked = (
+        sig_stft_db * (1 - sig_mask) + np.ones(np.shape(mask_gain_db)) * mask_gain_db * sig_mask
+    )
+    sig_imag_masked = np.imag(sig_stft) * (1 - sig_mask)
+    sig_stft_amp = (
+        db_to_amp(sig_stft_db_masked) * np.sign(sig_stft) + 1J * sig_imag_masked
+    )
+    
+    # Agar verbose mode chalu hai toh print karo mask application ka time
+    if verbose:
+        print("Mask application:", td(seconds=time.time() - start))
+        start = time.time()
+    
+    # Signal ko recover karo
+    recovered_signal = istft(sig_stft_amp, hop_length, win_length)
+    recovered_spec = amp_to_db(
+        np.abs(_stft(recovered_signal, n_fft, hop_length, win_length))
+    )
+    
+    # Agar verbose mode chalu hai toh print karo signal recovery ka time
+    if verbose:
+        print("Signal recovery:", td(seconds=time.time() - start))
+
+    # Agar visual mode chalu hai toh spectrogram plots banao aur dikhao
+    if visual:
+        plot_spectrogram(sig_stft_db, title="Signal")
+        plot_statistics_and_filter(mean_freq_noise, std_freq_noise, noise_thresh, smoothing_filter)
+        plot_spectrogram(sig_mask, title="Mask applied")
+        plot_spectrogram(sig_stft_db_masked, title="Masked signal")
+        plot_spectrogram(recovered_spec, title="Recovered spectrogram")
+    
+    # Recovered signal ko return karo
+    return recovered_signal
+
+#MASKING:Masking techniques aim to identify and attenuate the noise components while preserving the integrity of the desired signal. This often entails calculating statistical measures of the noise, such as its mean and standard deviation, to establish a threshold for distinguishing noise from signal.
 
 
 
