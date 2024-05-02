@@ -141,6 +141,11 @@ def db_to_amp(x):
     return librosa.core.db_to_amplitude(x, ref=1.0)
 
 
+#Spectral filtering is like tuning into a specific radio station while ignoring the others around it.
+
+
+
+
 
 
 
