@@ -3,6 +3,28 @@
 #audio_clip_band- NOISE+OGAudio
 #reduced_Noise -after adaptive filter is being applied
 #data- OGAudio
+import IPython 
+from scipy.io import wavfile
+import scipy.signal
+import scipy
+import numpy as np
+import matplotlib.pyplot as plt
+import librosa
+
+
+import matplotlib.pyplot as plt
+import IPython.display as ipd
+import soundfile as sf
+
+import urllib.request
+
+import wave
+%matplotlib inline
+
+#load data
+wav_loc = r'/Users/shawez/Noise-Reduction/Audiofile.wav'
+rate, data = wavfile.read(wav_loc,mmap=False)
+data=data/32768
 
 
 
